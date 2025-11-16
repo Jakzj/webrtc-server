@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h2>Live Viewer</h2>
+<video id="video" autoplay playsinline></video>
+
+<script>
+const ws = new WebSocket("WSS_URL_HIER");
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({ type: "register", role: "viewer" }));
+};
+
+let pc = new RTCPeerConnection();
+
+pc.ontrack = (e) => {
+  document.getElementById("video").srcObject = e.streams[0];
+};
+
+pc.onicecandidate = (e) => {
+  if (e.candidate) {
+    ws.send(JSON.stringify({ type: "candidate", candidate: e.candidate }));
+  }
+};
+
+ws.onmessage = (msg) => {
+  let data = JSON.parse(msg.data);
+
+  if (data.type === "offer") {
+    pc.setRemoteDescription(new RTCSessionDescription(data.offer))
+      .then(() => pc.createAnswer())
+      .then(a => {
+        pc.setLocalDescription(a);
+        ws.send(JSON.stringify({ type: "answer", answer: a }));
+      });
+  }
+
+  if (data.type === "candidate") {
+    pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+  }
+};
+</script>
+</body>
+</html>
